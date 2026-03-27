@@ -4,7 +4,9 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class CurrencyCalculatorGUI extends JFrame {
     private Database database;
@@ -17,6 +19,8 @@ public class CurrencyCalculatorGUI extends JFrame {
     private JComboBox<Currency> resultCurrencyCombo;
     private JTextField resultField;
     private JButton calculateButton;
+    private JButton resetCacheButton;
+    private boolean hasPopularEntry;
 
     public CurrencyCalculatorGUI() {
         database = new Database();
@@ -44,8 +48,19 @@ public class CurrencyCalculatorGUI extends JFrame {
         resultField.setEditable(false);
         resultField.setBackground(Color.WHITE);
 
+        PopularCurrencyRenderer renderer = new PopularCurrencyRenderer();
+        currencyFromCombo.setRenderer(renderer);
+        currencyToCombo.setRenderer(renderer);
+        resultCurrencyCombo.setRenderer(renderer);
+
         calculateButton = new JButton("Рассчитать");
         calculateButton.addActionListener(new CalculateListener());
+
+        resetCacheButton = new JButton("Сброс кэша");
+        resetCacheButton.addActionListener(e -> {
+            database.clearCurrencyUsage();
+            refreshCurrenciesPreserveSelection();
+        });
 
         // Добавление компонентов на форму
         gbc.gridx = 0; gbc.gridy = 0;
@@ -85,16 +100,79 @@ public class CurrencyCalculatorGUI extends JFrame {
         gbc.gridwidth = 2;
         add(calculateButton, gbc);
 
+        gbc.gridx = 7; gbc.gridy = 1;
+        gbc.gridwidth = 2;
+        add(resetCacheButton, gbc);
+
         setSize(1100, 150);
         setLocationRelativeTo(null);
     }
 
     private void loadCurrencies() {
-        List<Currency> currencies = database.getAllCurrencies();
+        loadCurrencies(null, null, null);
+    }
+
+    private void loadCurrencies(Integer fromId, Integer toId, Integer resultId) {
+        Currency preferredCurrency = database.getPreferredCurrency();
+        List<Currency> currencies = database.getCurrenciesForSelection();
+
+        currencyFromCombo.removeAllItems();
+        currencyToCombo.removeAllItems();
+        resultCurrencyCombo.removeAllItems();
+
+        hasPopularEntry = preferredCurrency != null;
+        if (preferredCurrency != null) {
+            currencyFromCombo.addItem(preferredCurrency);
+            currencyToCombo.addItem(preferredCurrency);
+            resultCurrencyCombo.addItem(preferredCurrency);
+        }
+
         for (Currency currency : currencies) {
             currencyFromCombo.addItem(currency);
             currencyToCombo.addItem(currency);
             resultCurrencyCombo.addItem(currency);
+        }
+
+        selectCurrencyById(currencyFromCombo, fromId);
+        selectCurrencyById(currencyToCombo, toId);
+        selectCurrencyById(resultCurrencyCombo, resultId);
+    }
+
+    private void refreshCurrenciesPreserveSelection() {
+        Integer fromId = getSelectedCurrencyId(currencyFromCombo);
+        Integer toId = getSelectedCurrencyId(currencyToCombo);
+        Integer resultId = getSelectedCurrencyId(resultCurrencyCombo);
+        loadCurrencies(fromId, toId, resultId);
+    }
+
+    private Integer getSelectedCurrencyId(JComboBox<Currency> combo) {
+        Currency currency = (Currency) combo.getSelectedItem();
+        return currency == null ? null : currency.getId();
+    }
+
+    private void selectCurrencyById(JComboBox<Currency> combo, Integer currencyId) {
+        if (currencyId == null) {
+            return;
+        }
+        for (int i = 0; i < combo.getItemCount(); i++) {
+            Currency currency = combo.getItemAt(i);
+            if (currency != null && currency.getId() == currencyId) {
+                combo.setSelectedIndex(i);
+                return;
+            }
+        }
+    }
+
+    private class PopularCurrencyRenderer extends DefaultListCellRenderer {
+        @Override
+        public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
+            JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+            if (index == 1 && hasPopularEntry) {
+                label.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, Color.GRAY));
+            } else {
+                label.setBorder(null);
+            }
+            return label;
         }
     }
 
@@ -143,6 +221,22 @@ public class CurrencyCalculatorGUI extends JFrame {
 
                 // Форматируем результат
                 resultField.setText(String.format("%.2f %s", result, resultCurrency.getSymbol()));
+
+                Set<Integer> usedCurrencyIds = new HashSet<>();
+                if (currencyFrom != null) {
+                    usedCurrencyIds.add(currencyFrom.getId());
+                }
+                if (currencyTo != null) {
+                    usedCurrencyIds.add(currencyTo.getId());
+                }
+                if (resultCurrency != null) {
+                    usedCurrencyIds.add(resultCurrency.getId());
+                }
+                for (Integer currencyId : usedCurrencyIds) {
+                    database.recordCurrencyUsage(currencyId);
+                }
+
+                refreshCurrenciesPreserveSelection();
 
             } catch (NumberFormatException ex) {
                 JOptionPane.showMessageDialog(CurrencyCalculatorGUI.this,
