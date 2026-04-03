@@ -1,23 +1,9 @@
-# ===== Maven =====
 target/
-!.mvn/wrapper/maven-wrapper.jar
-
-# ===== IntelliJ IDEA =====
 .idea/
 *.iml
-
-# ===== Logs =====
+*.db
 *.log
-
-# ===== OS files =====
+out/
 .DS_Store
 Thumbs.db
-
-# ===== Databases =====
-*.db
-
-# ===== Environment =====
 .env
-
-# ===== Build outputs =====
-out/
