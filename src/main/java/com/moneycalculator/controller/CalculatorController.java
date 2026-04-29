@@ -176,7 +176,8 @@ public class CalculatorController {
             }
 
             double finalResult = resultInUSD * resultCurrency.getRate();
-            view.getResultField().setText(String.format("%.4f %s", finalResult, resultCurrency.getSymbol()));
+            view.getResultField().setText(String.format("%.10f %s", finalResult, resultCurrency.getSymbol()));
+//            view.getResultField().setText(String.valueOf(finalResult));
 
         } catch (NumberFormatException e) {
             view.showError("Пожалуйста, введите корректные числовые значения");
